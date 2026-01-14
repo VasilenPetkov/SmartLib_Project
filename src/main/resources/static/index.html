@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <script src="https://js.stripe.com/v3/"></script>
+    <meta charset="UTF-8">
+    <title>SmartLib - Онлайн Библиотека</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; display: flex; justify-content: center; height: 100vh; overflow: hidden;}
+
+        .logo-big { font-size: 2.5em; font-weight: 800; color: #007bff; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px; letter-spacing: -1px;}
+        .logo-small { font-size: 1.4em; font-weight: 700; color: #333; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;}
+        .logo-header { font-size: 1.2em; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+
+        .cart-icon-container { position: relative; cursor: pointer; margin-right: 20px; font-size: 1.3em; transition: 0.2s; }
+        .cart-icon-container:hover { transform: scale(1.1); }
+        .cart-badge { position: absolute; top: -5px; right: -8px; background: #dc3545; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 11px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid #007bff;}
+
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(3px); }
+        .modal-content { background-color: #fff; margin: 10% auto; padding: 25px; border-radius: 15px; width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); position: relative; animation: slideDown 0.3s ease-out;}
+        @keyframes slideDown { from {transform: translateY(-50px); opacity: 0;} to {transform: translateY(0); opacity: 1;} }
+        .close-modal { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close-modal:hover { color: #000; }
+
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+        .cart-item-title { font-weight: bold; font-size: 0.95em; }
+        .remove-btn { color: #dc3545; cursor: pointer; font-size: 0.9em; font-weight: bold; }
+        .checkout-btn { width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin-top: 20px; cursor: pointer; }
+        .checkout-btn:hover { background: #218838; }
+
+        #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
+        .login-box { background: white; padding: 40px; border-radius: 15px; text-align: center; width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); }
+        .login-box input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 14px;}
+        .login-box button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 15px;}
+
+        .main-container { display: flex; width: 1000px; gap: 20px; height: 90vh; margin-top: 20px; }
+        .chat-section { flex: 2; background: white; border-radius: 15px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; }
+        .dashboard-section { flex: 1; background: white; border-radius: 15px; padding: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow-y: auto; }
+
+        .header { background: #007bff; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center;}
+        .header-right { display: flex; align-items: center; }
+        .logout-btn { cursor: pointer; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-size: 0.85em; transition: 0.2s;}
+        .logout-btn:hover { background: rgba(255,255,255,0.3); }
+
+        .chat-box { flex: 1; padding: 20px; overflow-y: auto; background: #f4f6f9; display: flex; flex-direction: column; gap: 10px; }
+        .input-area { display: flex; padding: 15px; background: white; border-top: 1px solid #eee; }
+        input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 25px; outline: none; padding-left: 20px; background: #f9f9f9;}
+        .send-btn { background: #007bff; color: white; border: none; padding: 10px 25px; margin-left: 10px; border-radius: 25px; cursor: pointer; font-weight: bold;}
+
+        .message { padding: 10px 18px; border-radius: 18px; max-width: 80%; font-size: 14px; line-height: 1.5; box-shadow: 0 1px 2px rgba(0,0,0,0.05);}
+        .bot-msg { background: white; border: 1px solid #e1e4e8; align-self: flex-start; border-bottom-left-radius: 4px; color: #444;}
+        .user-msg { background: #007bff; color: white; align-self: flex-end; border-bottom-right-radius: 4px;}
+
+        .action-btn { background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; margin-top: 8px; width: 100%; font-weight: 600; font-size: 0.9em; transition: 0.2s;}
+        .action-btn:hover { background: #218838; }
+        .action-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .my-book-item { background: white; padding: 12px; margin-bottom: 10px; border-radius: 10px; border: 1px solid #eee; box-shadow: 0 2px 4px rgba(0,0,0,0.02);}
+        .return-btn { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-top: 8px; font-size: 0.85em; width: 100%;}
+
+        .plan-btn { width: 100%; padding: 12px; margin-bottom: 8px; border: 1px solid #eee; background: white; cursor: pointer; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;}
+        .plan-price { font-weight: 700; color: #007bff; background: #e7f1ff; padding: 4px 8px; border-radius: 6px; font-size: 0.9em;}
+
+        .typing { display: flex; align-items: center; gap: 3px; height: 20px; }
+        .dot { width: 6px; height: 6px; background-color: #888; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+
+    .form-group { margin-bottom: 15px; text-align: left; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+    .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; }
+
+    /* Notifications */
+    .notif-btn { position: relative; cursor: pointer; margin-right: 15px; font-size: 1.3em; }
+    .notif-badge { position: absolute; top: -2px; right: -5px; background: #28a745; color: white; border-radius: 50%; width: 16px; height: 16px; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+
+    .msg-item { border-bottom: 1px solid #eee; padding: 15px; cursor: pointer; transition: 0.2s; }
+    .msg-item:hover { background: #f9f9f9; }
+    .msg-subject { font-weight: bold; color: #007bff; margin-bottom: 4px; }
+    .msg-date { font-size: 0.8em; color: #999; }
+    .msg-body { font-size: 0.9em; color: #555; margin-top: 5px; white-space: pre-line; display: none; background: #f1f3f5; padding: 10px; border-radius: 5px;}
+
+    .form-row { display: flex; gap: 10px; }
+    .form-row .form-group { flex: 1; }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="login-box">
+        <div class="logo-big">📚 Smart<span>Lib</span></div>
+        <h2>Вход в системата</h2>
+        <input type="text" id="username-input" placeholder="Потребителско име">
+        <input type="password" id="password-input" placeholder="Парола">
+        <button onclick="login()">Влез / Регистрация</button>
+        <div style="font-size: 12px; color: #888; margin-top: 20px;">
+            *Системата автоматично ще създаде профил, ако такъв не съществува.
+        </div>
+    </div>
+</div>
+
+<div id="cart-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeCart()">&times;</span>
+        <h3>🛒 Завършване на поръчка</h3>
+
+        <div id="checkout-step-1">
+            <div id="cart-items-container" style="max-height: 200px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #eee; padding: 10px;"></div>
+            <hr>
+            <div class="form-group">
+                <label>🚚 Начин на получаване:</label>
+                <select id="delivery-type" onchange="toggleAddress()">
+                    <option value="PICKUP">Взимане от библиотека (Безплатно)</option>
+                    <option value="COURIER">Доставка с куриер (Спиди/Еконт)</option>
+                </select>
+            </div>
+            <div class="form-group" id="address-group" style="display:none;">
+                <label>📍 Адрес за доставка:</label>
+                <input type="text" id="delivery-address" placeholder="гр. София, ул...">
+            </div>
+            <button class="checkout-btn" onclick="processOrder()">✅ Завърши поръчката</button>
+        </div>
+
+        <div id="checkout-loading" style="display:none; text-align:center; padding: 40px;">
+            <div class="typing" style="justify-content:center; margin-bottom:15px;">
+                <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+            </div>
+            <div>🔄 Обработване на заявката...</div>
+        </div>
+    </div>
+</div>
+<div id="sub-modal" class="modal">
+    <div class="modal-content" style="width: 380px;">
+        <span class="close-modal" onclick="document.getElementById('sub-modal').style.display='none'">&times;</span>
+        <h3>💳 Плащане на Абонамент</h3>
+        <p id="sub-plan-name" style="color:#007bff; font-weight:bold; margin-bottom: 20px;"></p>
+
+        <div id="card-element" style="padding: 12px; border: 1px solid #ccc; border-radius: 4px; background-color: white; margin-bottom: 10px;"></div>
+
+        <div id="card-errors" role="alert" style="color: #fa755a; font-size: 0.9em; margin-bottom: 10px;"></div>
+        <button class="checkout-btn" onclick="confirmSubscription()">💳 Плати сумата</button>
+    </div>
+</div>
+
+<div id="notif-modal" class="modal">
+    <div class="modal-content">
+        <span class="close-modal" onclick="document.getElementById('notif-modal').style.display='none'">&times;</span>
+        <h3>📧 Вашите Съобщения</h3>
+        <div id="notif-list" style="max-height: 400px; overflow-y: auto;"></div>
+    </div>
+</div>
+
+<div class="main-container" id="app-container" style="display: none;">
+    <div class="chat-section">
+        <div class="header">
+            <div class="logo-header">📚 SmartLib AI</div>
+            <div class="header-right">
+                <div class="notif-btn" onclick="openNotifications()">
+                    📧 <div class="notif-badge" id="notif-count" style="display:none">0</div>
+                </div>
+                <div class="cart-icon-container" onclick="openCart()">
+                    🛒 <div class="cart-badge" id="cart-count">0</div>
+                </div>
+                <div class="logout-btn" onclick="logout()">🚪 Изход</div>
+            </div>
+        </div>
+
+        <div class="chat-box" id="chat-box">
+            <div class="message bot-msg">Здравей! Аз съм твоят виртуален библиотекар. Какво ти се чете днес?</div>
+        </div>
+
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Напиши заглавие..." onkeypress="handleEnter(event)">
+            <button class="send-btn" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+
+    <div class="dashboard-section">
+        <div class="logo-small">📚 SmartLib <span style="font-weight: normal; font-size: 0.7em; color: #888;">Portal</span></div>
+        <h3 style="margin-bottom: 5px;">Здравей, <span id="user-display-name" style="color: #007bff;">...</span></h3>
+
+        <div id="sub-status-box" style="padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 25px; background: #fff5f5; color: #c62828; border: 1px solid #ffcdd2;">
+            <strong>Статус: НЕАКТИВЕН</strong>
+        </div>
+
+        <div id="payment-options">
+            <h4 style="margin-top: 0; color: #444; margin-bottom: 10px;">📅 Закупи абонамент:</h4>
+            <button class="plan-btn" onclick="payFee('WEEKLY')"><span>1 Седмица</span> <span class="plan-price">5 лв.</span></button>
+            <button class="plan-btn" onclick="payFee('MONTHLY')"><span>1 Месец</span> <span class="plan-price">15 лв.</span></button>
+            <button class="plan-btn" onclick="payFee('YEARLY')"><span>1 Година</span> <span class="plan-price">100 лв.</span></button>
+        </div>
+
+        <hr style="margin: 25px 0; border: 0; border-top: 1px solid #eee;">
+        <h4 style="margin-bottom: 15px; color: #444;">📖 Моите Книги</h4>
+        <div id="my-books-list"></div>
+    </div>
+</div>
+
+<script>
+    // --- ПОПРАВКА 1: Само веднъж дефинираме променливата ---
+    let currentUserId = null;
+    let selectedPlan = null;
+
+    // Инициализация на Stripe
+    const stripe = Stripe('pk_test_51SpXBFRZ0kCB37XxXB9d6rUNCLw0IKWWwl6T2s9dRUFaEjVT5XSaFK8VXTA20zG3tUwcgecUTQ2a93gTAA0mIfja00mLIr9qtx');
+    let elements;
+    let cardElement;
+
+    // --- ЛОГИН ---
+    async function login() {
+       const username = document.getElementById("username-input").value.trim();
+        const password = document.getElementById("password-input").value.trim();
+        if(!username || !password) return alert("Моля попълнете име и парола!");
+
+        try {
+            const res = await fetch(`/api/library/login?username=${username}&password=${password}`, { method: 'POST' });
+            if (!res.ok) return alert("Грешна парола!");
+
+            const user = await res.json();
+            currentUserId = user.id;
+            document.getElementById("user-display-name").innerText = user.username;
+
+            document.getElementById("login-screen").style.display = 'none';
+            document.getElementById("app-container").style.display = 'flex';
+
+            updateStatus();
+            loadMyBooks();
+            updateCartCount();
+            checkNotifications();
+        } catch (e) { alert("Грешка при връзка със сървъра!"); }
+    }
+
+    function logout() { location.reload(); }
+
+    // --- КОЛИЧКА---
+    async function updateCartCount() {
+        const res = await fetch(`/api/library/cart?userId=${currentUserId}`);
+        const cartItems = await res.json();
+        document.getElementById("cart-count").innerText = cartItems.length;
+    }
+
+    async function openCart() {
+        const res = await fetch(`/api/library/cart?userId=${currentUserId}`);
+        const cartItems = await res.json();
+        const container = document.getElementById("cart-items-container");
+        container.innerHTML = "";
+
+        if(cartItems.length === 0) {
+            container.innerHTML = "<p style='text-align:center; color:#999;'>Списъкът е празен.</p>";
+        } else {
+            cartItems.forEach(item => {
+                container.innerHTML += `
+                    <div class="cart-item">
+                        <div class="cart-item-title">${item.book.title} <br> <small style="color:#666">${item.book.author}</small></div>
+                        <div class="remove-btn" onclick="removeFromCart(${item.id})">Премахни</div>
+                    </div>
+                `;
+            });
+        }
+
+        document.getElementById("cart-modal").style.display = "block";
+    }
+
+    function closeCart() {
+        document.getElementById("cart-modal").style.display = "none";
+    }
+
+    async function addToCart(bookId) {
+        const res = await fetch(`/api/library/cart/add/${bookId}?userId=${currentUserId}`, { method: 'POST' });
+        const text = await res.text();
+        alert(text);
+        updateCartCount();
+    }
+
+    async function removeFromCart(cartItemId) {
+        await fetch(`/api/library/cart/remove/${cartItemId}`, { method: 'POST' });
+        openCart();
+        updateCartCount();
+    }
+
+    // --- ЧАТ БОТ ---
+    async function sendMessage() {
+        const inputField = document.getElementById("user-input");
+        const message = inputField.value.trim();
+        if (!message) return;
+
+        addMessage(message, "user-msg");
+        inputField.value = "";
+
+        const typingId = "typing-" + Date.now();
+        addMessage(`<div class="typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`, "bot-msg", true, typingId);
+
+        try {
+            const [response, _] = await Promise.all([
+                fetch(`/api/bot/ask?msg=${encodeURIComponent(message)}`),
+                new Promise(resolve => setTimeout(resolve, 1500))
+            ]);
+
+            const books = await response.json();
+            const typingBubble = document.getElementById(typingId);
+            if(typingBubble) typingBubble.remove();
+
+            if (books.length === 0) addMessage("Не открих нищо подходящо.", "bot-msg");
+            else {
+                addMessage("Ето какво намерих:", "bot-msg");
+                books.forEach(book => {
+                    const btnState = book.borrowed ? 'disabled' : '';
+                    const btnText = book.borrowed ? 'Вече заета' : '➕ Добави в списъка';
+                    const btnAction = `addToCart(${book.id})`;
+
+                    const bookHtml = `
+                        <div style="font-weight: bold; color: #333;">${book.title}</div>
+                        <div style="color: #666; font-size: 0.9em; margin-bottom: 8px;">${book.author} | ${book.genre}</div>
+                        <button class="action-btn" ${btnState} onclick="${btnAction}">${btnText}</button>
+                    `;
+                    addMessage(bookHtml, "bot-msg", true);
+                });
+            }
+        } catch (error) {
+            document.getElementById(typingId)?.remove();
+            addMessage("Грешка при свързване.", "bot-msg");
+        }
+    }
+
+    // --- ПРОФИЛ ФУНКЦИИ ---
+    async function loadMyBooks() {
+        const res = await fetch(`/api/library/my-books?userId=${currentUserId}`);
+        const books = await res.json();
+        const container = document.getElementById("my-books-list");
+        container.innerHTML = "";
+
+        if (books.length === 0) {
+            container.innerHTML = '<div style="color: #999; text-align: center; margin-top: 30px;">Нямате заети книги</div>';
+            return;
+        }
+
+        books.forEach(book => {
+            let dateHtml = "";
+            let statusColor = "#fff";
+            let borderColor = "#eee";
+
+            if (book.dueDate) {
+                const diffDays = Math.ceil((new Date(book.dueDate) - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24));
+                if (diffDays < 0) {
+                    dateHtml = `<span style="color: #c62828; font-weight: bold;">⚠️ ЗАКЪСНЯЛА с ${Math.abs(diffDays)} дни!</span>`;
+                    statusColor = "#fff5f5"; borderColor = "#ffcdd2";
+                } else {
+                    dateHtml = `<span style="color: #059669;">Остават ${diffDays} дни</span> <small style="color: #999;">(${book.dueDate})</small>`;
+                }
+            }
+
+            container.innerHTML += `
+                <div class="my-book-item" style="background: ${statusColor}; border-color: ${borderColor};">
+                    <div style="font-weight: bold; color: #333;">${book.title}</div>
+                    <div style="font-size: 0.9em; margin-bottom: 8px;">${dateHtml}</div>
+                    <button class="return-btn" onclick="returnBook(${book.id})">Върни книгата</button>
+                </div>`;
+        });
+    }
+
+    async function returnBook(id) {
+        if(!confirm("Връщате ли книгата?")) return;
+        await fetch(`/api/library/return/${id}`, {method:'POST'});
+        loadMyBooks();
+    }
+
+    // --- ПЛАЩАНЕ ---
+    function payFee(planType) {
+       selectedPlan = planType;
+        let planName = "";
+        let price = "";
+
+        if(planType === 'WEEKLY') { planName = "1 Седмица"; price = "5 лв."; }
+        if(planType === 'MONTHLY') { planName = "1 Месец"; price = "15 лв."; }
+        if(planType === 'YEARLY') { planName = "1 Година"; price = "100 лв."; }
+
+        document.getElementById("sub-plan-name").innerText = `${planName} - ${price}`;
+        document.getElementById("sub-modal").style.display = "block";
+
+        if (!elements) {
+            elements = stripe.elements();
+            cardElement = elements.create('card');
+            cardElement.mount('#card-element');
+        }
+    }
+
+     async function confirmSubscription() {
+        let amount = 0;
+        if (selectedPlan === 'WEEKLY') amount = 500;   // 5.00 EUR
+        if (selectedPlan === 'MONTHLY') amount = 1500; // 15.00 EUR
+        if (selectedPlan === 'YEARLY') amount = 10000; // 100.00 EUR
+
+        const confirmBtn = document.querySelector("#sub-modal button");
+        confirmBtn.disabled = true;
+        confirmBtn.innerText = "Обработка...";
+
+        try {
+            // 1. Взимаме Client Secret от Java
+            const res = await fetch('/api/library/create-payment-intent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amount: amount,
+                    currency: 'eur',
+                    userEmail: 'user@example.com',
+                    description: `Абонамент: ${selectedPlan}`
+                })
+            });
+
+            if (!res.ok) throw new Error("Сървърна грешка");
+
+            const data = await res.json();
+            const clientSecret = data.clientSecret;
+
+            // 2. Потвърждаваме плащането в Stripe
+            const result = await stripe.confirmCardPayment(clientSecret, {
+                payment_method: {
+                    card: cardElement,
+                    billing_details: {
+                        name: document.getElementById("user-display-name").innerText
+                    }
+                }
+            });
+
+            if (result.error) {
+                // Грешка от Stripe (напр. няма средства)
+                document.getElementById('card-errors').innerText = result.error.message;
+                alert("❌ Плащането неуспешно: " + result.error.message);
+            } else {
+                // 3. Плащането е успешно -> Активираме абонамента
+                if (result.paymentIntent.status === 'succeeded') {
+                    try {
+                        const activationRes = await fetch(`/api/library/activate-subscription?userId=${currentUserId}&planType=${selectedPlan}`, {
+                            method: 'POST'
+                        });
+
+                        if (activationRes.ok) {
+                            alert("✅ Плащането е успешно и абонаментът е активиран!");
+                            document.getElementById("sub-modal").style.display = "none";
+                            updateStatus();
+                            cardElement.clear();
+                        } else {
+                            alert("⚠️ Парите са взети, но възникна грешка при активирането.");
+                        }
+                    } catch (serverErr) {
+                        console.error(serverErr);
+                        alert("⚠️ Грешка при връзка със сървъра за активация.");
+                    }
+                }
+            }
+
+        } catch (err) {
+            // Catch за главния try (мрежови грешки)
+            console.error(err);
+            alert("Възникна техническа грешка!");
+        } finally {
+            // Винаги връщаме бутона в нормално състояние
+            confirmBtn.disabled = false;
+            confirmBtn.innerText = "Плати сумата";
+        }
+    }
+
+    async function updateStatus() {
+        const res = await fetch(`/api/library/status?userId=${currentUserId}`);
+        const data = await res.json();
+        const box = document.getElementById("sub-status-box");
+        const payOptions = document.getElementById("payment-options");
+
+        if (data.active) {
+            box.style.background = "#e6fffa"; box.style.color = "#047857"; box.style.borderColor = "#a7f3d0";
+            box.innerHTML = `<div>✅ АКТИВЕН</div><div>Остават: <strong>${data.daysLeft} дни</strong></div>`;
+            payOptions.style.display = "none";
+        } else {
+            box.style.background = "#fff5f5"; box.style.color = "#c62828"; box.style.borderColor = "#ffcdd2";
+            box.innerHTML = `<div>⛔ НЕАКТИВЕН</div>`;
+            payOptions.style.display = "block";
+        }
+    }
+
+    function addMessage(text, cls, isHtml = false, elementId = null) {
+        const div = document.createElement("div");
+        div.className = `message ${cls}`;
+        if (elementId) div.id = elementId;
+        if (isHtml) div.innerHTML = text; else div.textContent = text;
+        const chatBox = document.getElementById("chat-box");
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function handleEnter(e) { if(e.key==="Enter") sendMessage(); }
+
+    window.onclick = function(event) {
+        if (event.target == document.getElementById("cart-modal")) closeCart();
+    }
+
+    // --- UI ЛОГИКА ЗА CHECKOUT ---
+    function toggleAddress() {
+        const type = document.getElementById("delivery-type").value;
+        document.getElementById("address-group").style.display = (type === "COURIER") ? "block" : "none";
+    }
+
+    async function processOrder() {
+        const delivery = document.getElementById("delivery-type").value;
+        const address = document.getElementById("delivery-address").value.trim();
+
+        if (delivery === "COURIER" && !address) return alert("Моля въведете адрес за доставка!");
+
+        document.getElementById("checkout-step-1").style.display = "none";
+        document.getElementById("checkout-loading").style.display = "block";
+
+        await new Promise(r => setTimeout(r, 1000));
+
+        const res = await fetch(`/api/library/cart/process-order?userId=${currentUserId}&deliveryType=${delivery}&address=${encodeURIComponent(address)}`, { method: 'POST' });
+        const text = await res.text();
+
+        document.getElementById("checkout-loading").style.display = "none";
+        document.getElementById("checkout-step-1").style.display = "block";
+
+        if (text === "УСПЕХ") {
+            alert("✅ Поръчката е приета успешно!\nКнигите ще бъдат подготвени за вас.");
+            closeCart();
+            updateCartCount();
+            loadMyBooks();
+            checkNotifications();
+        } else {
+            alert("❌ " + text);
+        }
+    }
+
+    // --- СЪОБЩЕНИЯ ---
+    async function checkNotifications() {
+        const res = await fetch(`/api/library/notifications?userId=${currentUserId}`);
+        const msgs = await res.json();
+        const badge = document.getElementById("notif-count");
+
+        if (msgs.length > 0) {
+            badge.innerText = msgs.length;
+            badge.style.display = "flex";
+        } else {
+            badge.style.display = "none";
+        }
+    }
+
+    async function openNotifications() {
+        const res = await fetch(`/api/library/notifications?userId=${currentUserId}`);
+        const msgs = await res.json();
+        const list = document.getElementById("notif-list");
+        list.innerHTML = "";
+
+        if (msgs.length === 0) list.innerHTML = "<p style='text-align:center'>Нямате нови съобщения.</p>";
+
+        msgs.forEach(msg => {
+            list.innerHTML += `
+                <div class="msg-item" onclick="this.querySelector('.msg-body').style.display = this.querySelector('.msg-body').style.display==='block'?'none':'block'">
+                    <div class="msg-subject">${msg.subject}</div>
+                    <div class="msg-date">${new Date(msg.sentAt).toLocaleString()}</div>
+                    <div class="msg-body">${msg.message}</div>
+                </div>
+            `;
+        });
+        document.getElementById("notif-modal").style.display = "block";
+    }
+
+</script>
+</body>
+</html>
